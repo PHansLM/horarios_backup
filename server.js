@@ -1,33 +1,25 @@
 const express = require('express');
-const { Pool  } = require('pg');
+const pool = require('./db.js');
 
 const cors = require('cors');
 const app = express();
 const bodyParser = require('body-parser');
 const PORT = process.env.PORT || 5000;
 
+const routerUpload = require('./routes/upload.js');
+const { registrarHorario } = require('./controllers/controller.horario.js');
+
+
+const connectionString = "MAS - IPSP";
+//Middlewares
 app.use(cors());
 
-const connectionString ="MAS - IPSP";
 
-const pool = new Pool({
-    user: 'postgres',          // Reemplaza 'tu_usuario' con tu usuario de PostgreSQL
-    host: 'localhost',           // O la dirección de tu servidor PostgreSQL
-    database: 'umsshorarios',// Reemplaza 'tu_base_de_datos' con el nombre de tu base de datos
-    password: 'hans2003',   // Reemplaza 'tu_contraseña' con tu contraseña de PostgreSQL
-    port: 5432, 
-});
 
-pool.connect((err, client, release) => {
-    if (err) {
-        console.error('Error al conectar a la base de datos:', err);
-    } else {
-        console.log('Conexión exitosa a la base de datos');
-        release();
-    }
-});
 
-app.get('/get-carreras', async (res) => {
+app.use('/api/upload', routerUpload)
+
+app.get('/get-carreras', async (req,res) => {
     try {
         const consulta = 'SELECT * FROM "public"."carrera"';
         const resultado = await pool.query(consulta);
@@ -86,7 +78,6 @@ app.get('/get-clase', async (req, res) => {
 
 app.use(express.json({ limit: '10mb' }));
 
-
 app.post('/registrar-carrera', async (req, res) => {
     try {
         const { nombre, codigo} = req.body;
@@ -105,87 +96,14 @@ app.post('/registrar-carrera', async (req, res) => {
         res.status(500).json({ error: 'Error al agregar una nuevo carrera' });
     }
 });
+
 app.use(bodyParser.json());
 
 app.post('/registrar-horario', async (req, res) => {
-    try {
-        const { carrera, codigo_carrera, niveles } = req.body;
-        console.log('Recibido:', carrera, codigo_carrera, niveles);
-        // Comprobacion de entradas
-        if (!carrera || !codigo_carrera || !niveles || !Array.isArray(niveles)) {
-            return res.status(400).json({ error: 'Todos los campos son requeridos y niveles debe ser un arreglo' });
-        }
-
-        // Inicia una transacción
-        await pool.query('BEGIN');
-
-        // Inserta la carrera si no existe
-        const insertCarreraQuery = `
-            INSERT INTO carrera (nombre_carrera, codigo_carrera)
-            VALUES ($1, $2)
-            ON CONFLICT (codigo_carrera) DO NOTHING
-            RETURNING id_carrera
-        `;
-        const resultCarrera = await pool.query(insertCarreraQuery, [carrera, codigo_carrera]);
-        const id_carrera = resultCarrera.rows.length > 0 ? resultCarrera.rows[0].id_carrera : (await pool.query('SELECT id_carrera FROM carrera WHERE codigo_carrera = $1', [codigo_carrera])).rows[0].id_carrera;
-
-        for (const nivel of niveles) {
-            const { letra, materias } = nivel;
-
-            for (const materia of materias) {
-                const { nombre_materia, codigo_materia, grupos } = materia;
-
-                // Inserta la materia si no existe
-                const insertMateriaQuery = `
-                    INSERT INTO materia (nombre_materia, codigo_materia, id_carrera, nivel)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (codigo_materia) DO NOTHING
-                    RETURNING id_materia
-                `;
-                const resultMateria = await pool.query(insertMateriaQuery, [nombre_materia, codigo_materia, id_carrera, letra]);
-                const id_materia = resultMateria.rows.length > 0 ? resultMateria.rows[0].id_materia : (await pool.query('SELECT id_materia FROM materia WHERE codigo_materia = $1', [codigo_materia])).rows[0].id_materia;
-
-                for (const grupo of grupos) {
-                    const { numero_grupo, nombre_docente, clases } = grupo;
-
-                    // Inserta el grupo
-                    const insertGrupoQuery = `
-                        INSERT INTO grupo (numero_grupo, nombre_docente, id_materia)
-                        VALUES ($1, $2, $3)
-                        ON CONFLICT (id_materia, numero_grupo) DO UPDATE SET nombre_docente = EXCLUDED.nombre_docente
-                        RETURNING id_grupo
-                    `;
-                    const resultGrupo = await pool.query(insertGrupoQuery, [numero_grupo, nombre_docente, id_materia]);
-                    const id_grupo = resultGrupo.rows[0].id_grupo;
-
-                    const deleteClasesQuery = `DELETE FROM clase WHERE id_grupo = $1`;
-                    await pool.query(deleteClasesQuery, [id_grupo]);
-
-                    for (const clase of clases) {
-                        const { id_periodo, aula, dia } = clase;
-
-                        const insertClaseQuery = `
-                            INSERT INTO clase (id_grupo, id_periodo, aula, dia)
-                            VALUES ($1, $2, $3, $4)
-                        `;
-                        await pool.query(insertClaseQuery, [id_grupo, id_periodo, aula, dia]);
-                    }
-                }
-            }
-        }
-
-        // Finaliza la transacción
-        await pool.query('COMMIT');
-
-        res.json({ message: 'Horario registrado correctamente' });
-        
-    } catch (error) {
-        console.error('Error al registrar el horario:', error);
-        await pool.query('ROLLBACK');
-        res.status(500).json({ error: 'Error al registrar el horario' });
-    }
+    registrarHorario(req.body)
 });
+
 
 app.listen(PORT, () => {
     console.log(`Servidor backend iniciado en el puerto ${PORT}`);
-  });
+});
