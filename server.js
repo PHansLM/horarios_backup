@@ -32,11 +32,11 @@ app.get('/get-carreras', async (req,res) => {
 
 app.get('/get-materias', async (req, res) => {
     try {
-        const {id_carrera} = req.query;
-        if (!id_carrera) {
+        const {id_carrera, grado} = req.query;
+        if (!id_carrera, !grado) {
             return res.status(400).json({ error: 'El filtro es requerido' });
         }
-        const consulta = 'SELECT * FROM "public"."materia" WHERE id_carrera = '+id_carrera+';';
+        const consulta = 'SELECT * FROM "public"."materia" WHERE id_carrera = '+id_carrera+' AND nivel = '+grado+';';
         const resultado = await pool.query(consulta);
         res.json(resultado.rows);
     } catch (error) {
@@ -60,13 +60,13 @@ app.get('/get-grupos', async (req, res) => {
     }
 });
 
-app.get('/get-clase', async (req, res) => {
+app.get('/get-clase-por-grupo', async (req, res) => {
     try {
         const {id_grupo} = req.query;
         if (!id_grupo) {
             return res.status(400).json({ error: 'El filtro es requerido' });
         }
-        const consulta = 'SELECT * FROM "public"."clase" WHERE id_clase = '+id_grupo+';';
+        const consulta = 'SELECT * FROM "public"."vista_clase_periodos" WHERE id_grupo = '+id_grupo+';';
         const resultado = await pool.query(consulta);
         res.json(resultado.rows);
     } catch (error) {
