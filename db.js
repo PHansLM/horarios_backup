@@ -1,10 +1,10 @@
 const { Pool  } = require('pg');
 const pool = new Pool({
-    user: 'postgres',          // Reemplaza 'tu_usuario' con tu usuario de PostgreSQL
-    host: 'localhost',           // O la dirección de tu servidor PostgreSQL
-    database: 'base_horarios',// Reemplaza 'tu_base_de_datos' con el nombre de tu base de datos
-    password: 'hans2003',   // Reemplaza 'tu_contraseña' con tu contraseña de PostgreSQL
-    port: 5432, 
+    user: process.env.DB_USER || "postgres",
+    host: process.env.DB_HOST || '34.176.17.5',
+    database: process.env.DB_DATABASE || "postgres",
+    password: process.env.DB_PASSWORD || "cafecito123",
+    port: process.env.DB_PORT || "5432",
 });
 
 pool.connect((err, client, release) => {
